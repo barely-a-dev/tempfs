@@ -1,0 +1,9 @@
+debug/
+target/
+Cargo.lock
+**/*.rs.bk
+*.pdb
+# e1 example output
+output.txt
+# IDE config/proj files
+/.idea
