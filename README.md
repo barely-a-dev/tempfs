@@ -76,7 +76,7 @@ Full API documentation is available on [docs.rs](https://docs.rs/tempfs).
 
 ## License
 
-This project is licensed under the GNU GPLv3 License. See the [LICENSE](LICENSE) file for details.
+This project is dual licensed under the MIT and Apache 2.0 Licenses. See the [MIT license](LICENSE-MIT) and [Apache license](LICENSE-APACHE-2.0) files for details.
 
 ## Contributing
 
