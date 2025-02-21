@@ -1,0 +1,54 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-pc-windows-gnu
+            os: windows-latest
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+    
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: stable
+        targets: ${{ matrix.target }}
+    
+    - name: Install dependencies (Linux MUSL)
+      if: matrix.target == 'x86_64-unknown-linux-musl'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y musl-tools
+    
+    - name: Install dependencies (Windows GNU)
+      if: matrix.target == 'x86_64-pc-windows-gnu'
+      run: |
+        rustup set default-host ${{ matrix.target }}
+
+    - name: Build default
+      run: cargo build --verbose
+    
+    - name: Run tests default
+      run: cargo test --verbose
+    
+    - name: Build
+      run: cargo build --verbose --target ${{ matrix.target }}
+    
+    - name: Run tests
+      run: cargo test --verbose --target ${{ matrix.target }}
