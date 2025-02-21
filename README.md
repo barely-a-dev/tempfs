@@ -18,20 +18,7 @@
 
 ## Installation
 
-Add `tempfs` to your `Cargo.toml`:
-
-```toml
-[dependencies]
-tempfs = "0.7.5"
-```
-
-To enable one or more optional features, specify them like so:
-
-```toml
-[dependencies.tempfs]
-version = "0.7.5"
-features = ["full"]
-```
+Add `tempfs` to your `Cargo.toml` manually or use `cargo add tempfs [-F <feature>]*`.
 
 ## Usage
 
