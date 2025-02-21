@@ -4,7 +4,6 @@ use crate::global_consts::{NUM_RETRY, RAND_FN_LEN, VALID_CHARS};
 use rand::Rng;
 #[cfg(feature = "regex_support")]
 use regex::{Error as RErr, Regex};
-#[cfg(feature = "rand_gen")]
 use std::env;
 use std::fs;
 use std::io;
