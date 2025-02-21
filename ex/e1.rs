@@ -1,10 +1,12 @@
-use std::fs::File;
 use std::io::{Read, Seek, SeekFrom, Write};
 use tempfs::{TempFile, TempError};
 
 fn main() -> Result<(), TempError> {
     // Create a temporary file with a random name in the system's temp directory.
+    #[cfg(feature = "rand_gen")]
     let mut temp_file = TempFile::new_random::<std::path::PathBuf>(None)?;
+    #[cfg(not(feature = "rand_gen"))]
+    let mut temp_file = TempFile::new("./tmp/hello.txt")?;
 
     // Write some data to the temporary file.
     write!(temp_file, "Hello, temporary world!")?;

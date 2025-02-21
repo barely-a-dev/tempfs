@@ -1,9 +1,9 @@
 use std::io::Write;
-use tempfs::{TempDir, TempFile, TempError};
+use tempfs::{TempDir, TempError};
 
 fn main() -> Result<(), TempError> {
     // Create a temporary directory with a random name.
-    let mut temp_dir = TempDir::random::<std::path::PathBuf>(None)?;
+    let mut temp_dir = TempDir::new_random::<std::path::PathBuf>(None)?;
 
     // Create a temporary file with a specific name.
     {

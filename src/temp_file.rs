@@ -37,18 +37,45 @@ impl TempFile {
     ///
     /// # Arguments
     ///
-    /// * `path` - The path at which to create the file.
+    /// * `path` - The path at which to create the file. If a relative path is provided,
+    ///            it is resolved relative to the system temporary directory.
     ///
     /// # Errors
     ///
     /// Returns an error if the file cannot be created.
     pub fn new<P: AsRef<Path>>(path: P) -> TempResult<TempFile> {
-        let path_buf = path.as_ref().to_owned();
+        let path_ref = path.as_ref();
+        let path_buf = if path_ref.is_absolute() {
+            path_ref.to_owned()
+        } else {
+            env::temp_dir().join(path_ref)
+        };
         let file = Self::open(&path_buf)?;
         Ok(Self {
             path: Some(path_buf),
             file: Some(file),
         })
+    }
+
+    /// Creates a new temporary file at the specified path.
+    ///
+    /// The file is created with read and write permissions.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The path at which to create the file. If a relative path is provided,
+    ///            it is resolved relative to the current working directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be created.
+    pub fn new_here<P: AsRef<Path>>(path: P) -> TempResult<TempFile> {
+        if path.as_ref().is_relative()
+        {
+            Self::new(env::current_dir()?.join(path))
+        } else {
+            Self::new(path)
+        }
     }
 
     /// Converts the `TempFile` into a permanent file.
@@ -89,12 +116,22 @@ impl TempFile {
     /// # Arguments
     ///
     /// * `dir` - The directory in which to create the file. If `None`, the system temporary directory is used.
+    ///           If a relative directory is provided, it is resolved relative to the system temporary directory.
     ///
     /// # Errors
     ///
     /// Returns an error if a unique filename cannot be generated or if file creation fails.
     pub fn new_random<P: AsRef<Path>>(dir: Option<P>) -> TempResult<Self> {
-        let dir = dir.map_or(env::temp_dir(), |d| d.as_ref().to_path_buf());
+        let dir_buf = if let Some(d) = dir {
+            let d_ref = d.as_ref();
+            if d_ref.is_absolute() {
+                d_ref.to_path_buf()
+            } else {
+                env::temp_dir().join(d_ref)
+            }
+        } else {
+            env::temp_dir()
+        };
         let mut rng = rand::rng();
         for _ in 0..NUM_RETRY {
             let name: String = (0..RAND_FN_LEN)
@@ -103,7 +140,7 @@ impl TempFile {
                     VALID_CHARS[idx] as char
                 })
                 .collect();
-            let full_path = dir.join(&name);
+            let full_path = dir_buf.join(&name);
             if !full_path.exists() {
                 let file = Self::open(&full_path)?;
                 return Ok(Self {
@@ -116,7 +153,32 @@ impl TempFile {
             io::ErrorKind::AlreadyExists,
             "Could not generate a unique filename",
         )
-            .into())
+        .into())
+    }
+    
+    #[cfg(feature = "rand_gen")]
+    /// Creates a new temporary file with a random name in the given directory.
+    ///
+    /// The file name is generated using random ASCII characters.
+    ///
+    /// # Arguments
+    ///
+    /// * `dir` - The directory in which to create the file. If `None`, the current working directory is used.
+    ///           If a relative directory is provided, it is resolved relative to the current directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a unique filename cannot be generated or if file creation fails.
+    pub fn new_random_here<P: AsRef<Path>>(dir: Option<P>) -> TempResult<Self> {
+        if let Some(dir) = dir {
+            if dir.as_ref().is_absolute() {
+                Self::new_random(Some(dir))
+            } else {
+                Self::new_random(Some(env::current_dir()?.join(dir)))
+            }
+        } else {
+            Self::new_random(Some("./"))
+        }
     }
 
     // Helper method to open file.
@@ -157,7 +219,9 @@ impl TempFile {
     ///
     /// # Arguments
     ///
-    /// * `new_path` - The new path for the file. If relative, its new path will be its old path's parent, followed by this. So, if the file was in /tmp/hello.txt and this argument is "goodbye.txt", its new path will be "/tmp/goodbye.txt". See [`rename_here`](TempFile::rename_here) for a method which renames relative paths to ./`new_path`.
+    /// * `new_path` - The new path for the file. If relative, its new path will be its old path's parent,
+    ///                followed by this. See [`rename_here`](TempFile::rename_here) for a method which renames
+    ///                relative paths to the current directory.
     ///
     /// # Errors
     ///
@@ -191,7 +255,9 @@ impl TempFile {
     ///
     /// # Arguments
     ///
-    /// * `new_path` - The new path for the file. If relative, its new path will be the current directory, followed by this. So, if the file was in /tmp/hello.txt and this argument is "goodbye.txt", its new path will be "./goodbye.txt". See [`rename`](TempFile::rename) for a method which renames relative paths to `old_directory`/`new_path`.
+    /// * `new_path` - The new path for the file. If relative, its new path will be the current directory,
+    ///                followed by this. See [`rename`](TempFile::rename) for a method which renames relative
+    ///                paths to the old directory.
     ///
     /// # Errors
     ///
@@ -233,9 +299,7 @@ impl TempFile {
     ///
     /// Returns an error if flushing fails or if the file handle is not available.
     pub fn disarm(mut self) -> TempResult<()> {
-        self.file_mut()?
-            .flush()
-            .map_err(Into::<TempError>::into)?;
+        self.file_mut()?.flush().map_err(Into::<TempError>::into)?;
         self.path = None;
         Ok(())
     }
@@ -248,9 +312,7 @@ impl TempFile {
     ///
     /// Returns an error if flushing fails or if the file handle is not available.
     pub fn close(mut self) -> TempResult<()> {
-        self.file_mut()?
-            .flush()
-            .map_err(Into::<TempError>::into)?;
+        self.file_mut()?.flush().map_err(Into::<TempError>::into)?;
         self.path = None;
         self.file = None;
         Ok(())
@@ -282,9 +344,7 @@ impl TempFile {
     ///
     /// Returns an error if flushing fails, if the file handle is not available, or if file removal fails.
     pub fn delete(mut self) -> TempResult<()> {
-        self.file_mut()?
-            .flush()
-            .map_err(Into::<TempError>::into)?;
+        self.file_mut()?.flush().map_err(Into::<TempError>::into)?;
         if let Some(ref path) = self.path {
             std::fs::remove_file(path)?;
             self.path = None;
