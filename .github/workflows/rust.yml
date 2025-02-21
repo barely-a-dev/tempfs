@@ -42,13 +42,13 @@ jobs:
         rustup set default-host ${{ matrix.target }}
 
     - name: Build default
-      run: cargo build --verbose
+      run: cargo build --verbose -F full
     
     - name: Run tests default
-      run: cargo test --verbose
+      run: cargo test --verbose -F full
     
     - name: Build
-      run: cargo build --verbose --target ${{ matrix.target }}
+      run: cargo build --verbose -F full --target ${{ matrix.target }}
     
     - name: Run tests
-      run: cargo test --verbose --target ${{ matrix.target }}
+      run: cargo test --verbose -F full --target ${{ matrix.target }}
