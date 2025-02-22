@@ -37,8 +37,7 @@ impl TempFile {
     ///
     /// # Arguments
     ///
-    /// * `path` - The path at which to create the file. If a relative path is provided,
-    ///            it is resolved relative to the system temporary directory.
+    /// * `path` - The path at which to create the file. If a relative path is provided, it is resolved relative to the system temporary directory.
     ///
     /// # Errors
     ///
@@ -63,15 +62,13 @@ impl TempFile {
     ///
     /// # Arguments
     ///
-    /// * `path` - The path at which to create the file. If a relative path is provided,
-    ///            it is resolved relative to the current working directory.
+    /// * `path` - The path at which to create the file. If a relative path is provided, it is resolved relative to the current working directory.
     ///
     /// # Errors
     ///
     /// Returns an error if the file cannot be created.
     pub fn new_here<P: AsRef<Path>>(path: P) -> TempResult<TempFile> {
-        if path.as_ref().is_relative()
-        {
+        if path.as_ref().is_relative() {
             Self::new(env::current_dir()?.join(path))
         } else {
             Self::new(path)
@@ -115,8 +112,7 @@ impl TempFile {
     ///
     /// # Arguments
     ///
-    /// * `dir` - The directory in which to create the file. If `None`, the system temporary directory is used.
-    ///           If a relative directory is provided, it is resolved relative to the system temporary directory.
+    /// * `dir` - The directory in which to create the file. If `None`, the system temporary directory is used. If a relative directory is provided, it is resolved relative to the system temporary directory.
     ///
     /// # Errors
     ///
@@ -155,7 +151,7 @@ impl TempFile {
         )
         .into())
     }
-    
+
     #[cfg(feature = "rand_gen")]
     /// Creates a new temporary file with a random name in the given directory.
     ///
@@ -163,8 +159,7 @@ impl TempFile {
     ///
     /// # Arguments
     ///
-    /// * `dir` - The directory in which to create the file. If `None`, the current working directory is used.
-    ///           If a relative directory is provided, it is resolved relative to the current directory.
+    /// * `dir` - The directory in which to create the file. If `None`, the current working directory is used. If a relative directory is provided, it is resolved relative to the current directory.
     ///
     /// # Errors
     ///
@@ -181,7 +176,7 @@ impl TempFile {
         }
     }
 
-    // Helper method to open file.
+    /// Helper method to open file.
     fn open(path: &Path) -> TempResult<File> {
         OpenOptions::new()
             .create_new(true)
@@ -219,9 +214,7 @@ impl TempFile {
     ///
     /// # Arguments
     ///
-    /// * `new_path` - The new path for the file. If relative, its new path will be its old path's parent,
-    ///                followed by this. See [`rename_here`](TempFile::rename_here) for a method which renames
-    ///                relative paths to the current directory.
+    /// * `new_path` - The new path for the file. If relative, its new path will be its old path's parent, followed by this. See [`rename_here`](TempFile::rename_here) for a method which renames relative paths to the current directory.
     ///
     /// # Errors
     ///
@@ -255,9 +248,7 @@ impl TempFile {
     ///
     /// # Arguments
     ///
-    /// * `new_path` - The new path for the file. If relative, its new path will be the current directory,
-    ///                followed by this. See [`rename`](TempFile::rename) for a method which renames relative
-    ///                paths to the old directory.
+    /// * `new_path` - The new path for the file. If relative, its new path will be the current directory, followed by this. See [`rename`](TempFile::rename) for a method which renames relative paths to the old directory.
     ///
     /// # Errors
     ///
@@ -403,7 +394,7 @@ impl TempFile {
         }
     }
 
-    // Workaround for memmap2 API quirks... but seriously, why does it work like this?
+    /// Workaround for memmap2 API quirks... but seriously, why does it work like this?
     fn immut(file: &mut File) -> &File {
         Box::leak(Box::new(file))
     }

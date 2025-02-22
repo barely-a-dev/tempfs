@@ -28,6 +28,7 @@ impl Display for TempError {
 
 impl std::error::Error for TempError {}
 
+/// Result type which uses a `TempError`
 pub type TempResult<T> = Result<T, TempError>;
 
 impl From<io::Error> for TempError {

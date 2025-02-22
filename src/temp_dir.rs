@@ -29,8 +29,7 @@ impl TempDir {
     ///
     /// # Arguments
     ///
-    /// * `path` - The path at which to create the directory. If a relative path is provided,
-    ///            it is resolved relative to the system temporary directory.
+    /// * `path` - The path at which to create the directory. If a relative path is provided, it is resolved relative to the system temporary directory.
     ///
     /// # Errors
     ///
@@ -55,8 +54,7 @@ impl TempDir {
     ///
     /// # Arguments
     ///
-    /// * `path` - The path at which to create the directory. If a relative path is provided,
-    ///            it is resolved relative to the current directory.
+    /// * `path` - The path at which to create the directory. If a relative path is provided, it is resolved relative to the current directory.
     ///
     /// # Errors
     ///
@@ -77,8 +75,7 @@ impl TempDir {
     ///
     /// # Arguments
     ///
-    /// * `dir` - An optional parent directory in which to create the temporary directory.
-    ///           If a relative directory is provided, it is resolved relative to the system temporary directory.
+    /// * `dir` - An optional parent directory in which to create the temporary directory. If a relative directory is provided, it is resolved relative to the system temporary directory.
     ///
     /// # Errors
     ///
@@ -117,7 +114,7 @@ impl TempDir {
             io::ErrorKind::AlreadyExists,
             "Could not generate a unique directory name",
         )
-            .into())
+        .into())
     }
 
     /// Creates a new temporary directory with a random name in the given parent directory.
@@ -127,8 +124,7 @@ impl TempDir {
     ///
     /// # Arguments
     ///
-    /// * `dir` - An optional parent directory in which to create the temporary directory.
-    ///           If a relative directory is provided, it is resolved relative to the current working directory.
+    /// * `dir` - An optional parent directory in which to create the temporary directory. If a relative directory is provided, it is resolved relative to the current working directory.
     ///
     /// # Errors
     ///

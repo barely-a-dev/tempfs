@@ -1,6 +1,6 @@
 [package]
 name = "tempfs"
-version = "0.8.6"
+version = "0.9.6"
 edition = "2021"
 authors = ["barely-a-dev <nahman1234lol12@gmail.com>"]
 description = "A lightweight Rust crate for managing temporary files and directories with automatic cleanup."
@@ -16,7 +16,8 @@ categories = ["filesystem"]
 rand_gen = ["dep:rand"]
 mmap_support = ["dep:memmap2"]
 regex_support = ["dep:regex"]
-full = ["rand_gen", "mmap_support", "regex_support"]
+virt_fs = []
+full = ["rand_gen", "mmap_support", "regex_support", "virt_fs"]
 
 [[example]]
 name = "e1"

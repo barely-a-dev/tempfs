@@ -18,6 +18,8 @@ regex-based file filtering.
       dependency.)*
     - **`mmap_support`**: Enables memory mapping of temporary files via the `memmap2` crate.
     - **`regex_support`**: Enables regex-based filtering and searching of temporary files using the `regex` crate.
+    - **`virt_fs`**: Enables the new virt_fs module, providing a virtual, in-memory filesystem which mimics a Linux
+      filesystem.
     - **`full`**: Activates all optional features at once.
 
 ## Installation

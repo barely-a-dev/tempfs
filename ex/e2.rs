@@ -19,7 +19,7 @@ fn main() -> Result<(), TempError> {
 
     // List all the temporary files managed by the directory.
     for file_path in temp_dir.list_files() {
-        println!("Managed temp file: {:?}", file_path);
+        println!("Managed temp file: {file_path:?}");
     }
 
     // If the library was built with regex support, search for files matching a pattern.
@@ -28,7 +28,7 @@ fn main() -> Result<(), TempError> {
         let matching_files = temp_dir.find_files_by_pattern(r"^test\d\.txt$")?;
         for file in matching_files {
             if let Some(path) = file.path() {
-                println!("Found file matching regex: {:?}", path);
+                println!("Found file matching regex: {path:?}");
             }
         }
     }

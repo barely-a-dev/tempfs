@@ -13,7 +13,7 @@ fn main() -> Result<(), TempError> {
         let mmap = temp_file.mmap()?;
         let content = std::str::from_utf8(&mmap)
             .unwrap_or("Invalid UTF-8 sequence");
-        println!("Memory-mapped content: {}", content);
+        println!("Memory-mapped content: {content}");
     }
 
     Ok(())
