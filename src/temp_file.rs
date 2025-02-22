@@ -6,6 +6,8 @@ use memmap2::{Mmap, MmapMut, MmapOptions};
 use rand::Rng;
 use std::env;
 use std::fmt::{Debug, Formatter};
+#[cfg(feature = "display_files")]
+use std::fmt::Display;
 use std::fs::{File, OpenOptions};
 use std::io::{self, IoSlice, IoSliceMut, Read, Seek, SeekFrom, Write};
 use std::ops::{Deref, DerefMut};
@@ -270,7 +272,7 @@ impl TempFile {
 
     /// Synchronizes the file’s state with the storage device.
     ///
-    /// This is generally not needed. [`File::sync_all`](File::sync_all) for its purpose.
+    /// This is generally not needed. See [`File::sync_all`] for its purpose.
     ///
     /// # Errors
     ///
@@ -541,24 +543,28 @@ impl AsRef<Path> for TempFile {
     }
 }
 
-#[cfg(unix)]
-impl AsRawFd for TempFile {
-    fn as_raw_fd(&self) -> RawFd {
-        // Return -1 if the file is not available.
-        self.file.as_ref().map_or(-1, AsRawFd::as_raw_fd)
+impl AsRef<File> for TempFile {
+    fn as_ref(&self) -> &File {
+        self.file().expect("TempFile inner File is None")
+    }
+}
+
+impl AsMut<File> for TempFile {
+    fn as_mut(&mut self) -> &mut File {
+        self.file_mut().expect("TempFile inner File is None")
     }
 }
 
 impl Deref for TempFile {
     type Target = File;
     fn deref(&self) -> &Self::Target {
-        self.file.as_ref().expect("TempFile file is None")
+        self.file().expect("TempFile inner File is None")
     }
 }
 
 impl DerefMut for TempFile {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.file.as_mut().expect("TempFile file is None")
+        self.file_mut().expect("TempFile inner File is None")
     }
 }
 
@@ -570,5 +576,27 @@ impl std::os::windows::io::AsRawHandle for TempFile {
             .as_ref()
             .map(|f| f.as_raw_handle())
             .unwrap_or(std::ptr::null_mut())
+    }
+}
+
+#[cfg(unix)]
+impl AsRawFd for TempFile {
+    fn as_raw_fd(&self) -> RawFd {
+        // Return -1 if the file is not available.
+        self.file.as_ref().map_or(-1, AsRawFd::as_raw_fd)
+    }
+}
+
+#[cfg(feature = "display_files")]
+impl Display for TempFile {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self.file {
+            None => writeln!(f, "No file"),
+            Some(ref file) => {
+                let mut buf = Vec::new();
+                file.try_clone().expect("Failed to get new file handle").read_to_end(&mut buf).expect("Failed to read from file");
+                writeln!(f, "{}", sew::infallible::InfallibleString::from(buf))
+            }
+        }
     }
 }

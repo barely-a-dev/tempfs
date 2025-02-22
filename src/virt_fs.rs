@@ -1,5 +1,5 @@
 use std::fmt::Display;
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::Path;
 use std::time::SystemTime;
@@ -289,6 +289,37 @@ impl VirtFile {
             metadata: VirtMetadata::new(0o755),
             cursor: 0,
         })
+    }
+
+    /// Attempts to convert self into a real, open file, saving it at `export_path`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if opening or writing to the file fails.
+    pub fn into_real<P: AsRef<Path>>(self, export_path: P) -> std::io::Result<File> {
+        let mut file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(export_path)?;
+        file.write_all(&self.content)?;
+        Ok(file)
+    }
+
+    /// Gets a reference to the file's content.
+    #[must_use] pub fn content(&self) -> &[u8] {
+        &self.content
+    }
+
+    /// Gets the file's metadata.
+    #[must_use] pub fn metadata(&self) -> &VirtMetadata {
+        &self.metadata
+    }
+
+    /// Gets a mutable reference to the file's content.
+    pub fn content_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.content
     }
 }
 
@@ -954,5 +985,12 @@ impl Seek for VirtFile {
             self.cursor = new_pos as usize;
             Ok(self.cursor as u64)
         }
+    }
+}
+
+#[cfg(feature = "display_files")]
+impl Display for VirtFile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "{}", sew::infallible::InfallibleString::from(self.content.clone()))
     }
 }

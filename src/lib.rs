@@ -5,6 +5,7 @@
 //! - `mmap_support` : Support for memory mapping temporary files with memmap2.
 //! - `regex_support` : Support for searching temporary directory's contained files using regex.
 //! - `virt_fs` : Provides a virtual, in-memory filesystem with files, directories, permissions, metadata, and generally mimics a Linux filesystem.
+//! `display_files` : Allows Displaying `TempFile` and `VirtFile`.
 //! - `full` : Enables all of the above.
 
 /// Errors which can occur when using the types provided by tempfs.
