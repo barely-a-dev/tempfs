@@ -1,6 +1,6 @@
 [package]
 name = "tempfs"
-version = "0.10.7"
+version = "0.10.8"
 edition = "2021"
 authors = ["barely-a-dev <nahman1234lol12@gmail.com>"]
 description = "A lightweight Rust crate for managing temporary files and directories with automatic cleanup."

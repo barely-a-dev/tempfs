@@ -361,6 +361,7 @@ impl TempFile {
     /// # Errors
     ///
     /// Returns an error if the Path and File do not point to the same file.
+    #[cfg(unix)]
     pub fn from_fp<P: AsRef<Path>>(file: File, path: P) -> TempResult<Self> {
         if !Self::are_same_file(path.as_ref(), &file)? {
             return Err(TempError::InvalidFileOrPath);
@@ -372,12 +373,10 @@ impl TempFile {
     }
 
     /// Helper function to validate that a given &Path and File both point to the same file.
+    #[cfg(unix)]
     fn are_same_file(path: &Path, file: &File) -> io::Result<bool> {
         use std::fs::metadata;
-        #[cfg(unix)]
         use std::os::unix::fs::MetadataExt;
-        #[cfg(windows)]
-        use std::os::windows::fs::MetadataExt;
         let path_metadata = metadata(path)?;
         let file_metadata = file.metadata()?;
 
@@ -385,13 +384,6 @@ impl TempFile {
         {
             // Compare device and inode
             Ok(path_metadata.dev() == file_metadata.dev() && path_metadata.ino() == file_metadata.ino())
-        }
-
-        #[cfg(windows)]
-        {
-            // Compare file index and volume serial number
-            Ok(path_metadata.file_index() == file_metadata.file_index()
-                && path_metadata.volume_serial_number() == file_metadata.volume_serial_number())
         }
     }
 }
