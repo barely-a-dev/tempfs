@@ -1,5 +1,5 @@
 #[cfg(feature = "rand_gen")]
-use crate::global_consts::{NUM_RETRY, RAND_FN_LEN, VALID_CHARS};
+use crate::global_consts::{num_retry, rand_fn_len, valid_chars};
 #[cfg(feature = "rand_gen")]
 use rand::Rng;
 #[cfg(feature = "regex_support")]
@@ -93,11 +93,11 @@ impl TempDir {
         };
         let mut rng = rand::rng();
 
-        for _ in 0..NUM_RETRY {
-            let name: String = (0..RAND_FN_LEN)
+        for _ in 0..num_retry() {
+            let name: String = (0..rand_fn_len())
                 .map(|_| {
-                    let idx = rng.random_range(0..VALID_CHARS.len());
-                    VALID_CHARS[idx] as char
+                    let idx = rng.random_range(0..valid_chars().len());
+                    valid_chars()[idx] as char
                 })
                 .collect();
 
@@ -138,7 +138,7 @@ impl TempDir {
                 Self::new_random(Some(env::current_dir()?.join(&dir)))
             }
         } else {
-            Self::new_random(Some("./"))
+            Self::new_random(Some(env::current_dir()?))
         }
     }
 

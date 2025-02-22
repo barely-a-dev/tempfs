@@ -1,5 +1,5 @@
 #[cfg(feature = "rand_gen")]
-use crate::global_consts::{NUM_RETRY, RAND_FN_LEN, VALID_CHARS};
+use crate::global_consts::{num_retry, rand_fn_len, valid_chars};
 #[cfg(feature = "mmap_support")]
 use memmap2::{Mmap, MmapMut, MmapOptions};
 #[cfg(feature = "rand_gen")]
@@ -98,7 +98,7 @@ impl TempFile {
     ///
     /// Returns an error if renaming or persisting the file fails.
     pub fn persist_here<S: AsRef<str>>(&mut self, name: S) -> TempResult<File> {
-        self.rename(format!("./{}", name.as_ref()))?;
+        self.rename(env::current_dir()?.join(name.as_ref()))?;
         self.persist()
     }
 
@@ -126,11 +126,11 @@ impl TempFile {
             env::temp_dir()
         };
         let mut rng = rand::rng();
-        for _ in 0..NUM_RETRY {
-            let name: String = (0..RAND_FN_LEN)
+        for _ in 0..num_retry() {
+            let name: String = (0..rand_fn_len())
                 .map(|_| {
-                    let idx = rng.random_range(0..VALID_CHARS.len());
-                    VALID_CHARS[idx] as char
+                    let idx = rng.random_range(0..valid_chars().len());
+                    valid_chars()[idx] as char
                 })
                 .collect();
             let full_path = dir_buf.join(&name);
@@ -169,7 +169,7 @@ impl TempFile {
                 Self::new_random(Some(env::current_dir()?.join(dir)))
             }
         } else {
-            Self::new_random(Some("./"))
+            Self::new_random(Some(env::current_dir()?))
         }
     }
 
