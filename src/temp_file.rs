@@ -19,10 +19,7 @@ use crate::error::{TempError, TempResult};
 ///
 /// The file is opened with read and write permissions. When the instance is dropped,
 /// the underlying file is removed unless deletion is disarmed (for example, by calling
-/// [`TempFile::close`](TempFile::close) or [`into_inner`](TempFile::into_inner)).
-///
-/// # ***IMPORTANT:***
-/// Calling .`close()` will drop the underlying file handle. This will cause ***`deref`*** from [`Deref`] and ***`deref_mut`*** from [`DerefMut`] to **panic**. Be ***EXTREMELY*** careful with .`close()`.
+/// [`close`](TempFile::close) or [`into_inner`](TempFile::into_inner)).
 pub struct TempFile {
     /// The full path to the temporary file.
     pub(crate) path: Option<PathBuf>,
