@@ -4,17 +4,7 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::Path;
 use std::time::SystemTime;
 use std::{fs, str};
-
-/// Error types for virtual filesystem operations.
-#[derive(Debug)]
-pub enum FsError {
-    /// The file or directory was not found.
-    NotFound(String),
-    /// The file or directory already exists
-    AlreadyExists(String),
-    /// The path is invalid.
-    InvalidPath(String),
-}
+use crate::error::FsError;
 
 /// Splits a path string (e.g. "/a/b/c") into its non-empty components as string slices.
 fn get_components(path: &str) -> Vec<&str> {
