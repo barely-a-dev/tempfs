@@ -18,7 +18,8 @@ mmap_support = ["dep:memmap2"]
 regex_support = ["dep:regex"]
 virt_fs = []
 display_files = ["dep:sew"]
-full = ["rand_gen", "mmap_support", "regex_support", "virt_fs", "display_files"]
+full = ["rand_gen", "mmap_support", "regex_support", "virt_fs"]
+full_nightly = ["full", "display_files"]
 
 [[example]]
 name = "e1"
