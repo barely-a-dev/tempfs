@@ -6,6 +6,7 @@ use rand::Rng;
 use regex::{Error as RErr, Regex};
 use std::env;
 use std::fs;
+#[cfg(unix)]
 use std::fs::Permissions;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -24,6 +25,8 @@ pub struct TempDir {
     path: Option<PathBuf>,
     /// Temporary files contained within the directory.
     files: Vec<TempFile>,
+    /// The first created parent directory of the parent directories.
+    created_parent: Option<PathBuf>,
 }
 
 impl TempDir {
@@ -38,22 +41,18 @@ impl TempDir {
     /// # Errors
     ///
     /// Returns an error if the directory cannot be created.
-    // TODO: better permissions handling
     pub fn new<P: AsRef<Path>>(path: P) -> TempResult<Self> {
-        #[cfg(unix)]
-        use std::os::unix::fs::PermissionsExt;
         let path_ref = normalize_path(path.as_ref());
         let path_buf = if path_ref.is_absolute() {
             path_ref
         } else {
             env::temp_dir().join(path_ref)
         };
-        fs::create_dir_all(&path_buf)?;
-        #[cfg(unix)]
-        fs::set_permissions(&path_buf, Permissions::from_mode(0o700))?;
+        let created = Self::create_with_parent(&path_buf)?;
         Ok(Self {
             path: Some(path_buf),
             files: Vec::new(),
+            created_parent: created,
         })
     }
 
@@ -114,10 +113,11 @@ impl TempDir {
 
             let full_path = parent_dir.join(&name);
             if !full_path.exists() {
-                fs::create_dir_all(&full_path)?;
+                let created = Self::create_with_parent(&full_path)?;
                 return Ok(Self {
                     path: Some(full_path),
                     files: Vec::new(),
+                    created_parent: created,
                 });
             }
         }
@@ -126,6 +126,36 @@ impl TempDir {
             "Could not generate a unique directory name",
         )
         .into())
+    }
+
+    /// Function to create the directory and its parent directories, then set their permissions to rwx------, returning the first component of the parent's path which does not exist, or None if it all exists except for the child.
+    fn create_with_parent(path: &PathBuf) -> TempResult<Option<PathBuf>> {
+        #[cfg(unix)]
+        use std::os::unix::fs::PermissionsExt;
+        let nonexistent = crate::helpers::first_missing_directory_component(path);
+        fs::create_dir_all(path)?;
+
+        #[cfg(unix)]
+        if let Some(first_missing) = nonexistent.clone() {
+            let mut current = first_missing;
+            // Loop until the final directory in the path is reached.
+            while current != *path {
+                fs::set_permissions(&current, Permissions::from_mode(0o700))?;
+                // Append the next path component.
+                if let Some(component) = path.strip_prefix(&current).unwrap().components().next() {
+                    current = current.join(component);
+                } else {
+                    break;
+                }
+            }
+            // Finally, set permissions on the final directory.
+            fs::set_permissions(path, Permissions::from_mode(0o700))?;
+        } else {
+            // If no directory was missing (only the child directory was created)
+            fs::set_permissions(path, Permissions::from_mode(0o700))?;
+        }
+
+        Ok(nonexistent)
     }
 
     /// Creates a new temporary directory with a random name in the given parent directory.
@@ -274,8 +304,7 @@ impl TempDir {
     /// # Errors
     ///
     /// Returns an error if a unique directory name cannot be generated or if directory creation fails.
-    pub fn new_in<P: AsRef<Path>>(path: P) -> TempResult<Self>
-    {
+    pub fn new_in<P: AsRef<Path>>(path: P) -> TempResult<Self> {
         Self::new_random(Some(path))
     }
 }
@@ -336,9 +365,16 @@ impl TempDir {
 
 impl Drop for TempDir {
     fn drop(&mut self) {
-        self.files.clear();
-        if let Some(ref path) = self.path {
-            let _ = fs::remove_dir_all(path);
+        match (self.path.take(), self.created_parent.take()) {
+            (Some(p), None) => {
+                self.files.clear();
+                let _ = fs::remove_dir_all(p);
+            }
+            (Some(_), Some(d)) => {
+                self.files.clear();
+                let _ = fs::remove_dir_all(d);
+            }
+            _ => {}
         }
     }
 }

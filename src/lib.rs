@@ -17,6 +17,7 @@ pub mod temp_dir;
 /// Module providing temporary files.
 pub mod temp_file;
 
+/// Helpers for `temp_file` and `temp_dir`.
 mod helpers;
 
 #[cfg(feature = "virt_fs")]

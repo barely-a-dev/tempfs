@@ -1,10 +1,10 @@
+use crate::error::FsError;
 use std::fmt::Display;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::Path;
 use std::time::SystemTime;
 use std::{fs, str};
-use crate::error::FsError;
 
 /// Splits a path string (e.g. "/a/b/c") into its non-empty components as string slices.
 fn get_components(path: &str) -> Vec<&str> {
@@ -298,22 +298,24 @@ impl VirtFile {
     /// Returns an error if opening or writing to the file fails.
     pub fn into_real<P: AsRef<Path>>(self, export_path: P) -> std::io::Result<File> {
         let mut file = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open(export_path)?;
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(export_path)?;
         file.write_all(&self.content)?;
         Ok(file)
     }
 
     /// Gets a reference to the file's content.
-    #[must_use] pub fn content(&self) -> &[u8] {
+    #[must_use]
+    pub fn content(&self) -> &[u8] {
         &self.content
     }
 
     /// Gets the file's metadata.
-    #[must_use] pub fn metadata(&self) -> &VirtMetadata {
+    #[must_use]
+    pub fn metadata(&self) -> &VirtMetadata {
         &self.metadata
     }
 
@@ -991,6 +993,10 @@ impl Seek for VirtFile {
 #[cfg(feature = "display_files")]
 impl Display for VirtFile {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "{}", sew::infallible::InfallibleString::from(self.content.clone()))
+        writeln!(
+            f,
+            "{}",
+            sew::infallible::InfallibleString::from(self.content.clone())
+        )
     }
 }

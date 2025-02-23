@@ -7,7 +7,9 @@ use rand::Rng;
 #[cfg(feature = "display_files")]
 use std::fmt::Display;
 use std::fmt::{Debug, Formatter};
-use std::fs::{File, OpenOptions, Permissions};
+#[cfg(unix)]
+use std::fs::Permissions;
+use std::fs::{File, OpenOptions};
 use std::io::{self, IoSlice, IoSliceMut, Read, Seek, SeekFrom, Write};
 use std::ops::{Deref, DerefMut};
 #[cfg(unix)]
@@ -29,7 +31,7 @@ pub struct TempFile {
     /// The underlying file handle.
     file: Option<File>,
     /// Directories created to hold the temporary file that did not exist.
-    created_dir: Option<PathBuf>,
+    created_parent: Option<PathBuf>,
 }
 
 impl TempFile {
@@ -55,7 +57,7 @@ impl TempFile {
         Ok(Self {
             path: Some(path_buf),
             file: Some(file),
-            created_dir: created,
+            created_parent: created,
         })
     }
 
@@ -81,7 +83,7 @@ impl TempFile {
         Ok(Self {
             path: Some(path_buf),
             file: Some(file),
-            created_dir: created,
+            created_parent: created,
         })
     }
 
@@ -152,7 +154,7 @@ impl TempFile {
                 return Ok(Self {
                     path: Some(full_path),
                     file: Some(file),
-                    created_dir: created,
+                    created_parent: created,
                 });
             }
         }
@@ -251,8 +253,7 @@ impl TempFile {
     /// # Errors
     ///
     /// Returns an error if the file copy or deletion operation fails, or if the old file's parent directory cannot be determined when `new_path` is relative.
-    pub fn rename<P: AsRef<Path>>(&mut self, new_path: P) -> TempResult<()>
-    {
+    pub fn rename<P: AsRef<Path>>(&mut self, new_path: P) -> TempResult<()> {
         let mut new_path = normalize_path(new_path.as_ref());
         let pat = new_path.to_str().unwrap_or("");
         let mut mod_path = false;
@@ -261,13 +262,13 @@ impl TempFile {
         }
         if let Some(ref old_path) = self.path {
             if mod_path {
-                new_path =
-                    old_path
-                        .parent()
-                        .ok_or(TempError::IO(io::Error::new(
-                            io::ErrorKind::NotFound,
-                            "Old path parent not found",
-                        )))?.join(new_path);
+                new_path = old_path
+                    .parent()
+                    .ok_or(TempError::IO(io::Error::new(
+                        io::ErrorKind::NotFound,
+                        "Old path parent not found",
+                    )))?
+                    .join(new_path);
             }
             fs::copy(old_path, new_path.clone())?;
             fs::remove_file(old_path)?;
@@ -285,8 +286,7 @@ impl TempFile {
     /// # Errors
     ///
     /// Returns an error if the file copy or deletion operation fails.
-    pub fn rename_here<P: AsRef<Path>>(&mut self, new_path: P) -> TempResult<()>
-    {
+    pub fn rename_here<P: AsRef<Path>>(&mut self, new_path: P) -> TempResult<()> {
         let mut new_path = normalize_path(new_path.as_ref());
         let pat = new_path.to_str().unwrap_or("");
         let mut mod_path = false;
@@ -405,7 +405,7 @@ impl TempFile {
         Ok(Self {
             path: Some(path.as_ref().to_path_buf()),
             file: Some(file),
-            created_dir: None,
+            created_parent: None,
         })
     }
 
@@ -466,8 +466,7 @@ impl TempFile {
     /// # Safety
     ///
     /// This function intentionally leaks the provided file reference to extend its lifetime, satisfying the API requirements of the memory mapping library.
-    fn immut(file: &mut File) -> &File
-    {
+    fn immut(file: &mut File) -> &File {
         Box::leak(Box::new(file))
     }
 }
@@ -566,14 +565,14 @@ impl Debug for TempFile {
         f.debug_struct("TempFile")
             .field("path", &self.path)
             .field("file", &self.file)
-            .field("created_dir", &self.created_dir)
+            .field("created_dir", &self.created_parent)
             .finish()
     }
 }
 
 impl Drop for TempFile {
     fn drop(&mut self) {
-        match (self.path.take(), self.created_dir.take()) {
+        match (self.path.take(), self.created_parent.take()) {
             (Some(p), None) => {
                 let _ = fs::remove_file(p);
             }

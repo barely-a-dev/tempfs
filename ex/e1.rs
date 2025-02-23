@@ -1,6 +1,4 @@
 use std::io::{Read, Seek, SeekFrom, Write};
-use std::thread::sleep;
-use std::time::Duration;
 use tempfs::{TempFile, TempError};
 
 fn main() -> Result<(), TempError> {
@@ -12,7 +10,7 @@ fn main() -> Result<(), TempError> {
 
     // Write some data to the temporary file.
     write!(temp_file, "Hello, temporary world!")?;
-    
+
     // Move back to the start of the file before reading.
     temp_file.seek(SeekFrom::Start(0))?;
 

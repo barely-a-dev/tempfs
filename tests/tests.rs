@@ -85,4 +85,22 @@ mod tests {
         }
         assert!(!temp_dir_path.exists());
     }
+    
+    #[test]
+    fn test_temp_dir_nonexistent_parent() {
+        let par_path = env::temp_dir().join("test_temp_dir_nonexistent_parent/0");
+        let temp_dir_path = par_path.join("1/2/3/4/dir");
+        {
+            let mut temp_dir = TempDir::new(&temp_dir_path).expect("Failed to create TempDir");
+            assert!(temp_dir_path.exists());
+            temp_dir.create_file("read.txt").expect("Failed to create file");
+            temp_dir.get_file_mut("read.txt").unwrap().write_all(b"Content").expect("Failed to write to file");
+            temp_dir.get_file_mut("read.txt").unwrap().seek(SeekFrom::Start(0)).expect("Failed to seek");
+            let mut content = Vec::new();
+            temp_dir.get_file_mut("read.txt").unwrap().read_to_end(&mut content).unwrap();
+            assert_eq!(content, b"Content");
+        }
+        assert!(!temp_dir_path.exists());
+        assert!(!temp_dir_path.exists());
+    }
 }

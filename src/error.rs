@@ -1,6 +1,6 @@
-use std::error::Error;
 #[cfg(feature = "regex_support")]
 use regex::Error as RErr;
+use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::io;
 use std::path::PathBuf;
@@ -65,7 +65,7 @@ pub enum FsError {
 
 impl Display for FsError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self { 
+        match self {
             Self::NotFound(path) => write!(f, "Could not find file: {path}"),
             Self::AlreadyExists(path) => write!(f, "File already exists: {path}"),
             Self::InvalidPath(path) => write!(f, "Invalid path: {path}"),
