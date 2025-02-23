@@ -6,11 +6,15 @@ use rand::Rng;
 use regex::{Error as RErr, Regex};
 use std::env;
 use std::fs;
+use std::fs::Permissions;
 use std::io;
 use std::path::{Path, PathBuf};
 
 use crate::error::TempResult;
+use crate::helpers::normalize_path;
 use crate::temp_file::TempFile;
+
+// TODO: created_dir like in temp_file.rs
 
 /// A temporary directory that automatically cleans up its contents when dropped.
 ///
@@ -34,14 +38,19 @@ impl TempDir {
     /// # Errors
     ///
     /// Returns an error if the directory cannot be created.
+    // TODO: better permissions handling
     pub fn new<P: AsRef<Path>>(path: P) -> TempResult<Self> {
-        let path_ref = path.as_ref();
+        #[cfg(unix)]
+        use std::os::unix::fs::PermissionsExt;
+        let path_ref = normalize_path(path.as_ref());
         let path_buf = if path_ref.is_absolute() {
-            path_ref.to_owned()
+            path_ref
         } else {
             env::temp_dir().join(path_ref)
         };
         fs::create_dir_all(&path_buf)?;
+        #[cfg(unix)]
+        fs::set_permissions(&path_buf, Permissions::from_mode(0o700))?;
         Ok(Self {
             path: Some(path_buf),
             files: Vec::new(),
@@ -60,11 +69,13 @@ impl TempDir {
     ///
     /// Returns an error if the directory cannot be created.
     pub fn new_here<P: AsRef<Path>>(path: P) -> TempResult<Self> {
-        if path.as_ref().is_relative() {
-            Self::new(env::current_dir()?.join(path))
+        let path_ref = normalize_path(path.as_ref());
+        let path_buf = if path_ref.is_absolute() {
+            path_ref
         } else {
-            Self::new(path)
-        }
+            env::current_dir()?.join(path_ref)
+        };
+        Self::new(path_buf)
     }
 
     #[cfg(feature = "rand_gen")]
@@ -82,9 +93,9 @@ impl TempDir {
     /// Returns an error if a unique directory name cannot be generated or if directory creation fails.
     pub fn new_random<P: AsRef<Path>>(dir: Option<P>) -> TempResult<Self> {
         let parent_dir = if let Some(d) = dir {
-            let d_ref = d.as_ref();
+            let d_ref = normalize_path(d.as_ref());
             if d_ref.is_absolute() {
-                d_ref.to_path_buf()
+                d_ref
             } else {
                 env::temp_dir().join(d_ref)
             }
@@ -103,7 +114,7 @@ impl TempDir {
 
             let full_path = parent_dir.join(&name);
             if !full_path.exists() {
-                fs::create_dir(&full_path)?;
+                fs::create_dir_all(&full_path)?;
                 return Ok(Self {
                     path: Some(full_path),
                     files: Vec::new(),
@@ -132,13 +143,14 @@ impl TempDir {
     #[cfg(feature = "rand_gen")]
     pub fn new_random_here<P: AsRef<Path>>(dir: Option<P>) -> TempResult<Self> {
         if let Some(dir) = dir {
-            if dir.as_ref().is_absolute() {
-                Self::new_random(Some(dir))
+            let d_ref = normalize_path(dir.as_ref());
+            if d_ref.is_absolute() {
+                Self::new_random(Some(d_ref))
             } else {
-                Self::new_random(Some(env::current_dir()?.join(&dir)))
+                Self::new_random(Some(&env::current_dir()?.join(d_ref)))
             }
         } else {
-            Self::new_random(Some(env::current_dir()?))
+            Self::new_random(Some(&env::current_dir()?))
         }
     }
 
@@ -176,7 +188,8 @@ impl TempDir {
         let dir = self.path.as_ref().ok_or_else(|| {
             io::Error::new(io::ErrorKind::Other, "Temporary directory path is not set")
         })?;
-        self.files.push(TempFile::new_random(Some(dir))?);
+        self.files
+            .push(TempFile::new_random(Some(normalize_path(dir)))?);
         Ok(self.files.last_mut().unwrap())
     }
 
@@ -252,12 +265,17 @@ impl TempDir {
     }
 
     #[cfg(feature = "rand_gen")]
-    /// Creates a new `TempDir` in the given path.
+    /// Creates a new temporary directory with a random name within the given parent directory.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The parent directory in which to create the temporary directory. If a relative path is provided, it is resolved relative to the system temporary directory.
     ///
     /// # Errors
     ///
     /// Returns an error if a unique directory name cannot be generated or if directory creation fails.
-    pub fn new_in<P: AsRef<Path>>(path: P) -> TempResult<Self> {
+    pub fn new_in<P: AsRef<Path>>(path: P) -> TempResult<Self>
+    {
         Self::new_random(Some(path))
     }
 }

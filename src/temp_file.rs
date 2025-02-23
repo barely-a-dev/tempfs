@@ -4,18 +4,19 @@ use crate::global_consts::{num_retry, rand_fn_len, valid_chars};
 use memmap2::{Mmap, MmapMut, MmapOptions};
 #[cfg(feature = "rand_gen")]
 use rand::Rng;
-use std::env;
-use std::fmt::{Debug, Formatter};
 #[cfg(feature = "display_files")]
 use std::fmt::Display;
-use std::fs::{File, OpenOptions};
+use std::fmt::{Debug, Formatter};
+use std::fs::{File, OpenOptions, Permissions};
 use std::io::{self, IoSlice, IoSliceMut, Read, Seek, SeekFrom, Write};
 use std::ops::{Deref, DerefMut};
 #[cfg(unix)]
 use std::os::fd::{AsRawFd, RawFd};
 use std::path::{Path, PathBuf};
+use std::{env, fs};
 
 use crate::error::{TempError, TempResult};
+use crate::helpers::normalize_path;
 
 /// A temporary file that is automatically deleted when dropped unless explicitly closed.
 ///
@@ -27,6 +28,8 @@ pub struct TempFile {
     pub(crate) path: Option<PathBuf>,
     /// The underlying file handle.
     file: Option<File>,
+    /// Directories created to hold the temporary file that did not exist.
+    created_dir: Option<PathBuf>,
 }
 
 impl TempFile {
@@ -42,16 +45,17 @@ impl TempFile {
     ///
     /// Returns an error if the file cannot be created.
     pub fn new<P: AsRef<Path>>(path: P) -> TempResult<TempFile> {
-        let path_ref = path.as_ref();
+        let path_ref = normalize_path(path.as_ref());
         let path_buf = if path_ref.is_absolute() {
-            path_ref.to_owned()
+            path_ref
         } else {
             env::temp_dir().join(path_ref)
         };
-        let file = Self::open(&path_buf)?;
+        let (created, file) = Self::open(&path_buf)?;
         Ok(Self {
             path: Some(path_buf),
             file: Some(file),
+            created_dir: created,
         })
     }
 
@@ -67,11 +71,18 @@ impl TempFile {
     ///
     /// Returns an error if the file cannot be created.
     pub fn new_here<P: AsRef<Path>>(path: P) -> TempResult<TempFile> {
-        if path.as_ref().is_relative() {
-            Self::new(env::current_dir()?.join(path))
+        let path_ref = normalize_path(path.as_ref());
+        let path_buf = if path_ref.is_absolute() {
+            path_ref
         } else {
-            Self::new(path)
-        }
+            env::current_dir()?.join(path_ref)
+        };
+        let (created, file) = Self::open(&path_buf)?;
+        Ok(Self {
+            path: Some(path_buf),
+            file: Some(file),
+            created_dir: created,
+        })
     }
 
     /// Converts the `TempFile` into a permanent file.
@@ -118,11 +129,11 @@ impl TempFile {
     /// Returns an error if a unique filename cannot be generated or if file creation fails.
     pub fn new_random<P: AsRef<Path>>(dir: Option<P>) -> TempResult<Self> {
         let dir_buf = if let Some(d) = dir {
-            let d_ref = d.as_ref();
-            if d_ref.is_absolute() {
-                d_ref.to_path_buf()
+            let path_ref = normalize_path(d.as_ref());
+            if path_ref.is_absolute() {
+                path_ref
             } else {
-                env::temp_dir().join(d_ref)
+                env::temp_dir().join(path_ref)
             }
         } else {
             env::temp_dir()
@@ -137,10 +148,11 @@ impl TempFile {
                 .collect();
             let full_path = dir_buf.join(&name);
             if !full_path.exists() {
-                let file = Self::open(&full_path)?;
+                let (created, file) = Self::open(&full_path)?;
                 return Ok(Self {
                     path: Some(full_path),
                     file: Some(file),
+                    created_dir: created,
                 });
             }
         }
@@ -165,24 +177,45 @@ impl TempFile {
     /// Returns an error if a unique filename cannot be generated or if file creation fails.
     pub fn new_random_here<P: AsRef<Path>>(dir: Option<P>) -> TempResult<Self> {
         if let Some(dir) = dir {
-            if dir.as_ref().is_absolute() {
-                Self::new_random(Some(dir))
+            let d_ref = normalize_path(dir.as_ref());
+            if d_ref.is_absolute() {
+                Self::new_random(Some(d_ref))
             } else {
-                Self::new_random(Some(env::current_dir()?.join(dir)))
+                Self::new_random(Some(env::current_dir()?.join(d_ref)))
             }
         } else {
-            Self::new_random(Some(env::current_dir()?))
+            Self::new_random(Some(&env::current_dir()?))
         }
     }
 
-    /// Helper method to open file.
-    fn open(path: &Path) -> TempResult<File> {
-        OpenOptions::new()
+    /// Opens a new file at the specified path, creating any missing parent directories if necessary.
+    ///
+    /// If the file already exists, an error is returned. On success, this function returns a tuple containing:
+    /// - An `Option<PathBuf>` representing the created directory (if any),
+    /// - The newly created file handle.
+    fn open(path: &Path) -> TempResult<(Option<PathBuf>, File)> {
+        #[cfg(unix)]
+        use std::os::unix::fs::PermissionsExt;
+        let mut created = None;
+        let par = path.parent();
+        if path.exists() {
+            return Err(TempError::FileExists(path.to_path_buf()));
+        } else if let Some(c) = crate::helpers::first_missing_directory_component(path) {
+            fs::create_dir_all(par.unwrap())?;
+            created = Some(c);
+        }
+        let file = OpenOptions::new()
             .create_new(true)
             .read(true)
             .write(true)
             .open(path)
-            .map_err(Into::into)
+            .map_err(Into::into);
+        if file.is_err() && created.is_some() {
+            fs::remove_dir_all(created.clone().unwrap())?;
+        }
+        #[cfg(unix)]
+        fs::set_permissions(path, Permissions::from_mode(0o700))?;
+        file.map(|file| (created, file))
     }
 
     /// Returns a mutable reference to the file handle.
@@ -209,17 +242,18 @@ impl TempFile {
         self.path.as_deref()
     }
 
-    /// Renames the temporary file.
+    /// Copies the temporary file to a new path and deletes the original file, "renaming" it.
     ///
     /// # Arguments
     ///
-    /// * `new_path` - The new path for the file. If relative, its new path will be its old path's parent, followed by this. See [`rename_here`](TempFile::rename_here) for a method which renames relative paths to the current directory.
+    /// * `new_path` - The new path for the file. If `new_path` is relative, it is appended to the old file's parent directory.
     ///
     /// # Errors
     ///
-    /// Returns an error if the rename operation fails or the old path has no parent and the new path is relative.
-    pub fn rename<P: AsRef<Path>>(&mut self, new_path: P) -> TempResult<()> {
-        let mut new_path = new_path.as_ref().to_path_buf();
+    /// Returns an error if the file copy or deletion operation fails, or if the old file's parent directory cannot be determined when `new_path` is relative.
+    pub fn rename<P: AsRef<Path>>(&mut self, new_path: P) -> TempResult<()>
+    {
+        let mut new_path = normalize_path(new_path.as_ref());
         let pat = new_path.to_str().unwrap_or("");
         let mut mod_path = false;
         if !pat.contains('/') && !pat.contains('\\') {
@@ -227,33 +261,33 @@ impl TempFile {
         }
         if let Some(ref old_path) = self.path {
             if mod_path {
-                new_path = old_path
-                    .parent()
-                    .ok_or(TempError::IO(io::Error::new(
-                        io::ErrorKind::NotFound,
-                        "Old path parent not found",
-                    )))?
-                    .to_path_buf()
-                    .join(new_path);
+                new_path =
+                    old_path
+                        .parent()
+                        .ok_or(TempError::IO(io::Error::new(
+                            io::ErrorKind::NotFound,
+                            "Old path parent not found",
+                        )))?.join(new_path);
             }
-            std::fs::copy(old_path, new_path.clone())?;
-            std::fs::remove_file(old_path)?;
+            fs::copy(old_path, new_path.clone())?;
+            fs::remove_file(old_path)?;
             self.path = Some(new_path);
         }
         Ok(())
     }
 
-    /// Renames the temporary file using the current directory.
+    /// Copies the temporary file to a new path in the current directory and deletes the original file, "renaming" it.
     ///
     /// # Arguments
     ///
-    /// * `new_path` - The new path for the file. If relative, its new path will be the current directory, followed by this. See [`rename`](TempFile::rename) for a method which renames relative paths to the old directory.
+    /// * `new_path` - The new path for the file. If `new_path` is relative, it is resolved relative to the current working directory.
     ///
     /// # Errors
     ///
-    /// Returns an error if the rename operation fails.
-    pub fn rename_here<P: AsRef<Path>>(&mut self, new_path: P) -> TempResult<()> {
-        let mut new_path = new_path.as_ref().to_path_buf();
+    /// Returns an error if the file copy or deletion operation fails.
+    pub fn rename_here<P: AsRef<Path>>(&mut self, new_path: P) -> TempResult<()>
+    {
+        let mut new_path = normalize_path(new_path.as_ref());
         let pat = new_path.to_str().unwrap_or("");
         let mut mod_path = false;
         if !pat.contains('/') && !pat.contains('\\') {
@@ -263,8 +297,8 @@ impl TempFile {
             if mod_path {
                 new_path = env::current_dir()?.join(new_path);
             }
-            std::fs::copy(old_path, new_path.clone())?;
-            std::fs::remove_file(old_path)?;
+            fs::copy(old_path, new_path.clone())?;
+            fs::remove_file(old_path)?;
             self.path = Some(new_path);
         }
         Ok(())
@@ -336,7 +370,7 @@ impl TempFile {
     pub fn delete(mut self) -> TempResult<()> {
         self.file_mut()?.flush().map_err(Into::<TempError>::into)?;
         if let Some(ref path) = self.path {
-            std::fs::remove_file(path)?;
+            fs::remove_file(path)?;
             self.path = None;
         }
         Ok(())
@@ -347,9 +381,9 @@ impl TempFile {
     /// # Errors
     ///
     /// Returns an error if the metadata cannot be accessed or if the file has been closed.
-    pub fn metadata(&self) -> TempResult<std::fs::Metadata> {
+    pub fn metadata(&self) -> TempResult<fs::Metadata> {
         if let Some(ref path) = self.path {
-            std::fs::metadata(path).map_err(Into::into)
+            fs::metadata(path).map_err(Into::into)
         } else {
             Err(Into::into(io::Error::new(
                 io::ErrorKind::NotFound,
@@ -371,6 +405,7 @@ impl TempFile {
         Ok(Self {
             path: Some(path.as_ref().to_path_buf()),
             file: Some(file),
+            created_dir: None,
         })
     }
 
@@ -385,7 +420,8 @@ impl TempFile {
         #[cfg(unix)]
         {
             // Compare device and inode
-            Ok(path_metadata.dev() == file_metadata.dev() && path_metadata.ino() == file_metadata.ino())
+            Ok(path_metadata.dev() == file_metadata.dev()
+                && path_metadata.ino() == file_metadata.ino())
         }
     }
 }
@@ -424,8 +460,14 @@ impl TempFile {
         }
     }
 
-    /// Workaround for memmap2 API quirks... but seriously, why does it work like this?
-    fn immut(file: &mut File) -> &File {
+    // Workaround for memmap2 API quirks... but seriously, why does it work like this?
+    /// Converts a mutable file reference into a static immutable reference for use with memory mapping.
+    ///
+    /// # Safety
+    ///
+    /// This function intentionally leaks the provided file reference to extend its lifetime, satisfying the API requirements of the memory mapping library.
+    fn immut(file: &mut File) -> &File
+    {
         Box::leak(Box::new(file))
     }
 }
@@ -524,14 +566,21 @@ impl Debug for TempFile {
         f.debug_struct("TempFile")
             .field("path", &self.path)
             .field("file", &self.file)
+            .field("created_dir", &self.created_dir)
             .finish()
     }
 }
 
 impl Drop for TempFile {
     fn drop(&mut self) {
-        if let Some(ref path) = self.path {
-            let _ = std::fs::remove_file(path);
+        match (self.path.take(), self.created_dir.take()) {
+            (Some(p), None) => {
+                let _ = fs::remove_file(p);
+            }
+            (Some(_), Some(d)) => {
+                let _ = fs::remove_dir_all(d);
+            }
+            _ => {}
         }
     }
 }
@@ -594,7 +643,10 @@ impl Display for TempFile {
             None => writeln!(f, "No file"),
             Some(ref file) => {
                 let mut buf = Vec::new();
-                file.try_clone().expect("Failed to get new file handle").read_to_end(&mut buf).expect("Failed to read from file");
+                file.try_clone()
+                    .expect("Failed to get new file handle")
+                    .read_to_end(&mut buf)
+                    .expect("Failed to read from file");
                 writeln!(f, "{}", sew::infallible::InfallibleString::from(buf))
             }
         }

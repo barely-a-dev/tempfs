@@ -3,6 +3,7 @@ use std::error::Error;
 use regex::Error as RErr;
 use std::fmt::{Display, Formatter};
 use std::io;
+use std::path::PathBuf;
 
 #[derive(Debug)]
 /// Errors that can occur when using `TempDir` or `TempFile`.
@@ -16,6 +17,8 @@ pub enum TempError {
     #[cfg(feature = "regex_support")]
     /// A `RegEx` error.
     Regex(RErr),
+    /// The given path already exists.
+    FileExists(PathBuf),
 }
 
 impl Display for TempError {
@@ -26,6 +29,7 @@ impl Display for TempError {
             Self::IO(e) => write!(f, "IO error: {e}"),
             #[cfg(feature = "regex_support")]
             Self::Regex(e) => write!(f, "Regex error: {e}"),
+            Self::FileExists(path) => write!(f, "Entry at path already exists: {}", path.display()),
         }
     }
 }

@@ -17,6 +17,8 @@ pub mod temp_dir;
 /// Module providing temporary files.
 pub mod temp_file;
 
+mod helpers;
+
 #[cfg(feature = "virt_fs")]
 /// Module providing a virtual unix-like filesystem.
 pub mod virt_fs;
