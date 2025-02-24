@@ -3,7 +3,7 @@ use crate::global_consts::{num_retry, rand_fn_len, valid_chars};
 #[cfg(feature = "rand_gen")]
 use rand::Rng;
 #[cfg(feature = "regex_support")]
-use regex::{Error as RErr, Regex};
+use regex::Regex;
 use std::env;
 use std::fs;
 #[cfg(unix)]
@@ -15,11 +15,10 @@ use crate::error::TempResult;
 use crate::helpers::normalize_path;
 use crate::temp_file::TempFile;
 
-// TODO: created_dir like in temp_file.rs
-
 /// A temporary directory that automatically cleans up its contents when dropped.
 ///
 /// Files created through the `TempDir` are tracked and removed upon drop.
+#[derive(Debug)]
 pub struct TempDir {
     /// The full path to the temporary directory.
     path: Option<PathBuf>,
@@ -320,7 +319,7 @@ impl TempDir {
     /// # Errors
     ///
     /// Returns an error if the regex pattern is invalid.
-    pub fn find_files_by_pattern<S: AsRef<str>>(&self, pattern: S) -> Result<Vec<&TempFile>, RErr> {
+    pub fn find_files_by_pattern<S: AsRef<str>>(&self, pattern: S) -> TempResult<Vec<&TempFile>> {
         let re = Regex::new(pattern.as_ref())?;
         Ok(self
             .files
@@ -347,7 +346,7 @@ impl TempDir {
     pub fn find_files_by_pattern_mut<S: AsRef<str>>(
         &mut self,
         pattern: S,
-    ) -> Result<Vec<&mut TempFile>, RErr> {
+    ) -> TempResult<Vec<&mut TempFile>> {
         let re = Regex::new(pattern.as_ref())?;
         Ok(self
             .files

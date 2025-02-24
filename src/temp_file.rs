@@ -25,6 +25,7 @@ use crate::helpers::normalize_path;
 /// The file is opened with read and write permissions. When the instance is dropped,
 /// the underlying file is removed unless deletion is disarmed (for example, by calling
 /// [`close`](TempFile::close) or [`into_inner`](TempFile::into_inner)).
+#[derive(Debug)]
 pub struct TempFile {
     /// The full path to the temporary file.
     pub(crate) path: Option<PathBuf>,
@@ -201,7 +202,7 @@ impl TempFile {
         let mut created = None;
         let par = path.parent();
         if path.exists() {
-            return Err(TempError::FileExists(path.to_path_buf()));
+            return Err(TempError::PathExists(path.to_path_buf()));
         } else if let Some(c) = crate::helpers::first_missing_directory_component(path) {
             fs::create_dir_all(par.unwrap())?;
             created = Some(c);
@@ -557,16 +558,6 @@ impl Seek for TempFile {
                 TempError::FileIsNone,
             ))
         }
-    }
-}
-
-impl Debug for TempFile {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("TempFile")
-            .field("path", &self.path)
-            .field("file", &self.file)
-            .field("created_dir", &self.created_parent)
-            .finish()
     }
 }
 

@@ -18,7 +18,7 @@ pub enum TempError {
     /// A `RegEx` error.
     Regex(RErr),
     /// The given path already exists.
-    FileExists(PathBuf),
+    PathExists(PathBuf),
 }
 
 impl Display for TempError {
@@ -29,7 +29,7 @@ impl Display for TempError {
             Self::IO(e) => write!(f, "IO error: {e}"),
             #[cfg(feature = "regex_support")]
             Self::Regex(e) => write!(f, "Regex error: {e}"),
-            Self::FileExists(path) => write!(f, "Entry at path already exists: {}", path.display()),
+            Self::PathExists(path) => write!(f, "Entry at path already exists: {}", path.display()),
         }
     }
 }

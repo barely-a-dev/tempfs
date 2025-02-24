@@ -16,13 +16,12 @@ mod global_consts;
 pub mod temp_dir;
 /// Module providing temporary files.
 pub mod temp_file;
-
-/// Helpers for `temp_file` and `temp_dir`.
-mod helpers;
-
 #[cfg(feature = "virt_fs")]
 /// Module providing a virtual unix-like filesystem.
 pub mod virt_fs;
+/// Helpers for `temp_file` and `temp_dir`.
+mod helpers;
+
 pub use error::*;
 pub use temp_dir::TempDir;
 pub use temp_file::TempFile;

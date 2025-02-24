@@ -22,6 +22,7 @@ pub fn normalize_path<P: AsRef<Path>>(path: P) -> PathBuf {
     normalized
 }
 
+/// Returns the path up to the first nonexistent directory component, or None if it all exists except the final component.
 pub fn first_missing_directory_component(path: &Path) -> Option<PathBuf> {
     // Get the parent directory (ignore the final component)
     let parent = path.parent()?;
